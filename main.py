@@ -71,3 +71,61 @@ df_fair = engine.transform(df_clean, cols=['age', 'hours-per-week'])
 
 print("\n--- NEW OPTIMIZED FAIR INCOME RATES ---")
 print(df_fair.groupby(['race', 'sex'])['income'].mean().round(3))
+
+# ==========================================
+# THE ML "BEFORE & AFTER" AUDIT
+# ==========================================
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from afs import FairnessAuditor # Your custom auditor!
+
+print("\n==========================================")
+print(" 🚀 THE ULTIMATE 'BEFORE & AFTER' AUDIT")
+print("==========================================")
+
+def train_and_audit(data, dataset_name):
+    # 1. Prepare the data
+    X = data.drop(columns=['income'])
+    y = data['income']
+    
+    # We will audit based on 'sex' for this demonstration (1=Male/Privileged, 0=Female)
+    protected = data['sex'] 
+    
+    X_train, X_test, y_train, y_test, attr_train, attr_test = train_test_split(
+        X, y, protected, test_size=0.2, random_state=42
+    )
+    
+    # 2. Train the Model
+    clf = LogisticRegression(max_iter=1000, random_state=42)
+    clf.fit(X_train, y_train)
+    y_pred = clf.predict(X_test)
+    
+    accuracy = accuracy_score(y_test, y_pred)
+    
+    # 3. Run the Fairness Engine!
+    # Using X_test.values to avoid pandas warnings in NearestNeighbors
+    auditor = FairnessAuditor(
+        y_true=y_test,
+        y_pred=y_pred,
+        protected_attr=attr_test,
+        priv_class=1,
+        unpriv_class=0,
+        X_features=X_test.values 
+    )
+    report = auditor.calculate_afs()
+    
+    # 4. Print the Scorecard
+    print(f"\n>> Model trained on {dataset_name}")
+    print(f"   Accuracy: {accuracy*100:.1f}%")
+    print(f"   Aggregated Fairness Score (AFS): {report['Aggregated_Fairness_Score']:.1f} / 100")
+    print(f"   Verdict: {report['Verdict']}")
+    print(f"   - Disparate Impact (80% Rule): {report['Metrics']['DI']:.2f}")
+    print(f"   - Equal Opportunity Diff:      {report['Metrics']['EOD']:.2f}")
+    print(f"   - Theil Index (Individual):    {report['Metrics']['Theil_Index']:.3f}")
+
+# Run the audit on the original biased data
+train_and_audit(df_clean, "ORIGINAL BIASED DATA")
+
+# Run the audit on your newly optimized data
+train_and_audit(df_fair, "OPTIMIZED FAIR DATA")
