@@ -279,15 +279,16 @@ async def run_preprocess(req: PreprocessRequest):
             df_for_afs   = remover.fit_transform(df_work.copy(), binned_col, numeric_cols)
 
         elif algo == 'optimized':
-            e           = float(params.get('epsilon', 0.05))
+            e = float(params.get('epsilon', 0.05))
             distortion  = float(params.get('distortion', 3.0))
             bins_count  = int(params.get('bins', 4))
-            use_cols    = numeric_cols[:2]      # limit to 2 continuous cols to keep runtime sane
-            engine      = OptimizedPreprocessor(
-                prot=[binned_col], target=target, e=e, distortion=distortion
-            )
-            engine.fit(df_work.copy(), cols=use_cols, bins=bins_count)
-            df_for_afs  = engine.transform(df_work.copy(), cols=use_cols)
+            use_cols = numeric_cols[:2]
+            optimizer_cols = list(dict.fromkeys(use_cols + [target, binned_col]))
+            df_opt = df_work[optimizer_cols].copy()
+
+            engine = OptimizedPreprocessor(prot=[binned_col], target=target, e=e, distortion=distortion)
+            engine.fit(df_opt.copy(), cols=use_cols, bins=bins_count)
+            df_for_afs  = engine.transform(df_opt.copy(), cols=use_cols)
 
         else:
             return {"error": f"Unknown algorithm: '{algo}'"}
